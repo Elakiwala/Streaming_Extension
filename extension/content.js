@@ -1,87 +1,54 @@
-const style = document.createElement("link");
-style.rel = "stylesheet";
-style.href = chrome.runtime.getURL("style.css");
-document.head.appendChild(style);
+// Récupérer l'ID de session depuis localStorage de la page
+const sessionId = localStorage.getItem("syncparty-session-id");
 
+if (!sessionId) {
+  console.log("SyncParty : Pas de session active.");
+} else {
+  console.log(`SyncParty : Session active : ${sessionId}`);
+  initSyncParty(sessionId);
+}
 
-const socket = io("https://VOTRE_URL_NGROK.ngrok.io", {
-  auth: { token: "token1" }
-});
+function initSyncParty(sessionId) {
+  // Chercher la vidéo sur la page
+  const video = document.querySelector("video");
 
-const room = window.location.hostname;
-
-socket.emit("join-room", room);
-
-// Chat texte
-const chatBox = document.createElement("div");
-chatBox.innerHTML = `
-  <div id="sync-chat" style="position:fixed;bottom:10px;right:10px;width:300px;background:#fff;border:1px solid #ccc;z-index:9999;">
-    <div><input id="msg" placeholder="Message..." style="width:80%;"><button id="send">Envoyer</button></div>
-    <div id="messages" style="max-height:200px;overflow:auto;"></div>
-    <button id="audio">Activer vocal</button>
-  </div>
-`;
-document.body.appendChild(chatBox);
-
-document.getElementById("send").onclick = () => {
-  const msg = document.getElementById("msg").value;
-  socket.emit("message", { room, text: msg });
-};
-
-socket.on("message", ({ text }) => {
-  const div = document.createElement("div");
-  div.textContent = text;
-  document.getElementById("messages").appendChild(div);
-});
-
-// WebRTC vocal
-let localStream, peer;
-document.getElementById("audio").onclick = async () => {
-  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  peer = new RTCPeerConnection();
-
-  localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
-
-  peer.onicecandidate = ({ candidate }) => {
-    if (candidate) socket.emit("signal", { to: room, candidate });
-  };
-
-  peer.ontrack = e => {
-    const audio = new Audio();
-    audio.srcObject = e.streams[0];
-    audio.play();
-  };
-
-  const offer = await peer.createOffer();
-  await peer.setLocalDescription(offer);
-
-  socket.emit("signal", { to: room, offer });
-};
-
-socket.on("signal", async data => {
-  if (data.offer) {
-    peer = new RTCPeerConnection();
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
-
-    peer.onicecandidate = ({ candidate }) => {
-      if (candidate) socket.emit("signal", { to: room, candidate });
-    };
-    peer.ontrack = e => {
-      const audio = new Audio();
-      audio.srcObject = e.streams[0];
-      audio.play();
-    };
-
-    await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
-    const answer = await peer.createAnswer();
-    await peer.setLocalDescription(answer);
-    socket.emit("signal", { to: room, answer });
+  if (!video) {
+    console.log("SyncParty : Pas de vidéo détectée sur cette page.");
+    return;
   }
-  if (data.answer) {
-    await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
-  }
-  if (data.candidate) {
-    await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
-  }
-});
+
+  // Afficher une petite UI discrète pour test
+  let statusDiv = document.createElement("div");
+  statusDiv.style.position = "fixed";
+  statusDiv.style.bottom = "10px";
+  statusDiv.style.right = "10px";
+  statusDiv.style.backgroundColor = "rgba(0,0,0,0.7)";
+  statusDiv.style.color = "white";
+  statusDiv.style.padding = "5px 10px";
+  statusDiv.style.fontSize = "14px";
+  statusDiv.style.borderRadius = "5px";
+  statusDiv.style.zIndex = 9999;
+  statusDiv.textContent = `Session: ${sessionId} | État: prêt`;
+  document.body.appendChild(statusDiv);
+
+  // Écouteurs d'événements vidéo
+  video.addEventListener("play", () => {
+    statusDiv.textContent = `Session: ${sessionId} | État: lecture`;
+    console.log("SyncParty : lecture démarrée");
+    // Ici on enverra au serveur la commande 'play'
+  });
+
+  video.addEventListener("pause", () => {
+    statusDiv.textContent = `Session: ${sessionId} | État: pause`;
+    console.log("SyncParty : lecture en pause");
+    // Ici on enverra au serveur la commande 'pause'
+  });
+
+  video.addEventListener("seeked", () => {
+    statusDiv.textContent = `Session: ${sessionId} | Position: ${Math.floor(video.currentTime)}s`;
+    console.log("SyncParty : position changée à", video.currentTime);
+    // Ici on enverra au serveur la commande 'seek'
+  });
+
+  // TODO: Connexion WebSocket au serveur Render (étape 3)
+}
