@@ -38,7 +38,7 @@ ___	extension/
 	- content.js (chat écrit vocal (WebSocket + WebRTC))
 	- popup.html (interface simple)
 	- icon.png (icone par défaut)
-	- background.js (requis par Manifest V3 (vide pour l'instant)
+	- background.js (requis par Manifest V3 (vide pour l'instant))
 	- popup.js
 	- style.css
 ___serveur/
